@@ -4,7 +4,7 @@ LSP number:
 Model Version: v0.1
 
 The full model implementation with training, dataloaders, etc. can be found in the training_v2.py file in the github repository
-GitHub: .
+GitHub: https://github.com/Efoks/custom_semantic_segmentation.
 """
 
 import torch
