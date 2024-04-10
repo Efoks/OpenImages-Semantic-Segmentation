@@ -12,16 +12,16 @@ import torchvision.transforms as transforms
 
 class OpenImagesDataset(Dataset):
 
-    def __init__(self, data_dir, classes, class_suffixes = ['m0663v', 'm0pg52', 'm07clx'], transform=None, normalize=None):
+    def __init__(self, data_dir, classes, transform=None, normalize=None):
         self.data_dir = data_dir
         self.transform = transform
         self.normalize = normalize
-        self.class_suffixes = class_suffixes
         self.images = []
         self.masks = []
         self.classes_dir = []
-        for cls in classes:
 
+        # Dataset is divided into diferent classes, each class has a folder with images and masks
+        for cls in classes:
             class_dir = os.path.join(data_dir, cls.lower())
             images_dir = os.path.join(class_dir, 'images')
             masks_dir = os.path.join(class_dir, 'segmentations')
@@ -31,7 +31,7 @@ class OpenImagesDataset(Dataset):
             masks = os.listdir(masks_dir)
 
             for image in images:
-                pre_mask_name = image.split('.')[0]
+                pre_mask_name = image.split('.')[0] # Used for finding the corresponding mask
                 mask_name = next((name for name in masks if name.startswith(pre_mask_name)), None)
                 if mask_name is not None:
                     self.images.append(image)
@@ -58,13 +58,15 @@ class OpenImagesDataset(Dataset):
 
         img = Image.open(img_path).convert("RGB")
         mask = Image.open(mask_path)
+
         if self.transform:
             img = self.transform(img)
             mask = self.transform(mask)
+        # Normalization is only applied to the image
         if self.normalize:
             img = self.normalize(img)
 
-        mask = torch.where(mask == 1, torch.tensor(cfg.CLASS_DICT[class_name]), torch.tensor(0))
+        mask = torch.where(mask == 1, torch.tensor(cfg.CLASS_DICT[class_name]), torch.tensor(0)) # Assigning class values to the mask
         mask = F.one_hot(mask.to(torch.int64).squeeze(), num_classes=4)
         mask = mask.permute(2, 0, 1)
 
@@ -76,14 +78,22 @@ def create_data_split(images_idx, masks_idx):
     test_sampler = SubsetRandomSampler(images_test)
     return train_sampler, test_sampler
 
-def create_data_loader(batch_size, data_dir = cfg.DATA_DIR, classes = ['Pizza', 'Taxi', 'Dog'], transform=None, normalize=None):
+def create_data_loader(batch_size, data_dir = cfg.DATA_DIR, classes = ['Pizza', 'Taxi', 'Dog'], transform=None, normalize=None, create_data_split = True):
     dataset = OpenImagesDataset(data_dir, classes, transform=transform, normalize=normalize)
-    train_sampler, test_sampler = create_data_split(range(len(dataset)), range(len(dataset)))
 
-    train_data_loader = DataLoader(dataset, batch_size=batch_size, sampler = train_sampler)
-    test_data_loader = DataLoader(dataset, batch_size=batch_size, sampler = test_sampler)
+    if create_data_split:
+        # Used for model training
+        train_sampler, test_sampler = create_data_split(range(len(dataset)), range(len(dataset)))
 
-    return train_data_loader, test_data_loader
+        train_data_loader = DataLoader(dataset, batch_size=batch_size, sampler=train_sampler)
+        test_data_loader = DataLoader(dataset, batch_size=batch_size, sampler=test_sampler)
+        return train_data_loader, test_data_loader
+
+    else:
+        # Used for model evaluation
+        data_loader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
+        return data_loader
+
 
 def plot_image_and_mask(dataloader):
     for img, mask in dataloader:

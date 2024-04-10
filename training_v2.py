@@ -28,13 +28,13 @@ def train_model(model, train_dataset, val_dataset, optimizer, criterion, writer,
             optimizer.zero_grad()
             output_logits = model(image)
 
-            mask_indices = torch.argmax(mask, dim=1)
+            mask_indices = torch.argmax(mask, dim=1) # Convert one-hot to indices
             loss = criterion(output_logits, mask_indices)
             loss.backward()
             optimizer.step()
 
             writer.add_scalar('Training Loss', loss.item(), epoch * len(train_dataset) + batch_idx)
-            del loss, output_logits
+            del loss, output_logits # To save memory
 
         print(
             f"GPU memory usage after epoch {epoch} in training: {torch.cuda.memory_allocated(cfg.DEVICE) / 1024 ** 2} MB")
@@ -78,6 +78,7 @@ def train_model(model, train_dataset, val_dataset, optimizer, criterion, writer,
 def save_model_parameters(model, file_path):
     torch.save(model.state_dict(), file_path)
 
+
 def visualize_predictions(image, mask, model):
     model.eval()
     with torch.no_grad():
@@ -99,6 +100,7 @@ if __name__ == '__main__':
     transformations = transforms.Compose([transforms.ToTensor(),
                                           transforms.Resize((256, 256))])
 
+    # Transformations only for images, so they are passed separately
     image_normalization = transforms.Compose([transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                                                    std=[0.229, 0.224, 0.225])])
 
@@ -109,10 +111,13 @@ if __name__ == '__main__':
     model = mdl.fcn_model()
     model.to(cfg.DEVICE)
 
-    timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
+    timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S') # Used for tensorboard logging
     experiment_dir = os.path.join(cfg.EXPERIMENT_DIR, timestamp)
+
+    # Redundant code, as the directory is created by SummaryWriter. Need to remove it.
     # if not os.path.exists(experiment_dir):
-    #     os.makedirs(experiment_dir)
+        # os.makedirs(experiment_dir)
+
     comment = input("Enter a name for this experiment: ")
     writer = SummaryWriter(experiment_dir, comment=comment)
 
@@ -120,11 +125,9 @@ if __name__ == '__main__':
     optimizer = optim.Adam(trainable_params, lr=3e-4, weight_decay=1e-4)
     criterion = nn.CrossEntropyLoss()
 
-
     train_model(model, train_dataset, val_dataset, optimizer, criterion, writer, num_epochs)
 
-
-    # save_model = input("Do you want to save the model parameters? (yes/no): ")
+    save_model = input("Do you want to save the model parameters? (yes/no): ")
     save_model = 'yes'
     if save_model.lower() == 'yes':
         save_model_parameters(model, f'model_parameters_{comment}.pth')
@@ -132,7 +135,7 @@ if __name__ == '__main__':
 
     writer.close()
 
-    # visualize = input("Do you want to visualize predictions? (yes/no): ")
+    visualize = input("Do you want to visualize predictions? (yes/no): ")
     visualize = 'yes'
     if visualize.lower() == 'yes':
         for image, mask in val_dataset:
